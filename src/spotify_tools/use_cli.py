@@ -147,7 +147,7 @@ def interactive_menu() -> None:
         print("\n=== Spotify Tools ===")
         print("1) Scan playlist for duplicates")
         print("2) Delete playlist duplicates")
-        print("3) Explicit content checker (metadata or lyrics)")
+        print("3) Explicit content filter (based on Explicit flag or lyrics)")
         print("4) See my Top 5 (tracks/artists)")
         print("0) Exit")
         choice = input("Choose an option: ").strip()

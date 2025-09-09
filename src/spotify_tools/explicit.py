@@ -34,19 +34,6 @@ def load_banned_words_from_purgomalum() -> set[str]:
 
 
 
-def load_banned_words() -> set[str]: 
-    """
-    One-time fetch of the profanity list from Purgomalum.
-    Returns a set of words (lowercased).
-    """
-    try:
-        r = requests.get("https://www.purgomalum.com/profanitylist.html", timeout=15)
-        r.raise_for_status()
-        words = [w.strip().lower() for w in r.text.split(",") if w.strip()]
-        return set(words)
-    except Exception as e:
-        print(f"Warning: failed to fetch profanity list ({e})")
-        return set()
 
 def _normalize_words(s: str) -> List[str]:
     return [w.lower() for w in _TOKEN_RE.findall(s or "")]
@@ -145,6 +132,10 @@ def explicit_report_from_playlist(
                         "uri": uri,
                         "reason": f"lyrics_banned_words:{','.join(hits)}"
                     })
+            elif not lyrics:
+                print("Lyrics could not be found for the following song:")
+                print(f"{name} - {', '.join(artists)}")
+
 
 
         if idx % 25 == 0 or idx == len(items): 
@@ -161,26 +152,54 @@ def print_explicit_report(rows: List[Dict]) -> None:
     print("")
 
 def interactive_run(client: SpotifyClient) -> None:
-    print("\n=== Explicit Content Checker ===")
+    print("\n=== Explicit Content Filter ===")
     playlist = input("Paste playlist URL or ID: ").strip()
     print("Choose mode:")
     print("  1) Fast (Spotify 'explicit' flag only)")
     print("  2) Lyrics scan (LRCLIB) + fallback to metadata flag")
-    choice = (input("Enter 1 or 2 [1]: ").strip() or "1")
+    choice = (input("Enter 1 or 2: ").strip() or "1")
     mode = "metadata" if choice == "1" else "lyrics"
-
-    add_words = input("Add comma-separated extra banned words (optional): ").strip()
-    extra_words = [w.strip() for w in add_words.split(",")] if add_words else None
+    
+    extra_words = None
+    # do not allow lyrics in the metadata mode because the lyric library is slow
+    if mode == "lyrics":
+        add_words = input("Add comma-separated extra banned words (optional): ").strip()
+        extra_words = [w.strip() for w in add_words.split(",")] if add_words else None
 
     rows = explicit_report_from_playlist(client, playlist, mode=mode, extra_banned_words=extra_words)
     print_explicit_report(rows)
 
-    # if user is in interactive mode give them as little options as possible
-    # save = input("Save results to JSON? [y/N]: ").strip().lower()
-    # if save == "y":
-    #     import json, pathlib
-    #     path = pathlib.Path("explicit_report.json")
-    #     path.write_text(json.dumps(rows, indent=2), encoding="utf-8")
-    #     print(f"Wrote {path.resolve()}")
+    # Give user choice to scrub playlist if explicit songs detected
+    if not rows: 
+        return 
+
+    print("What would you like to do with explicit songs?")
+    print("  1) Do nothing")
+    print("  2) Construct a NEW playlist with only clean songs")
+    print("  3) Delete the explicit songs from the given playlist")
+    action = input("Enter 1/2/3: ").strip() or "1"
+
+    explicit_uris = {r["uri"] for r in rows if r.get("uri")}
+    # Fetch all tracks in the original playlist so we know the clean ones
+    items = list(client.iter_playlist_items(playlist, write=True))
+    all_uris = [t.get("track", {}).get("uri") for t in items if t.get("track")]
+    clean_uris = [u for u in all_uris if u and u not in explicit_uris]
+
+    if action == "2":
+        user_id = client.get_current_user_id()
+        old_playlist_name = client.playlist_name_from_id(playlist, write=False)
+        new_playlist_name = f"Clean version of {old_playlist_name}" if old_playlist_name else "Clean Version"
+        new_id = client.create_playlist(user_id, name=new_playlist_name, description=f"Filtered copy of {playlist}", public=False)
+        # Spotify limits to 100 per add_items
+        for i in range(0, len(clean_uris), 100):
+            client.add_items(new_id, clean_uris[i:i+100])
+        print(f"Created new clean playlist: {new_id}")
+
+    elif action == "3":
+        # Remove explicit songs in chunks
+        uris_to_remove = list(explicit_uris)
+        for i in range(0, len(uris_to_remove), 100):
+            client.remove_by_uri(playlist, uris_to_remove[i:i+100])
+        print(f"Removed {len(explicit_uris)} explicit songs from playlist.")
 
 

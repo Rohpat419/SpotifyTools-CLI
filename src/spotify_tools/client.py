@@ -60,7 +60,7 @@ class SpotifyClient:
             if len(parts) >= 2 and parts[-2] == "playlist":
                 return parts[-1]
         
-        print("Playlist ID not parsed by parser, I hope you know what you're doing")        
+        print("Playlist ID not filtered by parser, either correct ID given or the parser was skipped accidentally")        
         return input
 
 
@@ -71,12 +71,16 @@ class SpotifyClient:
         url = f"{API_URL}/playlists/{pid}/tracks"
         params = {"limit": 100}
 
-        while True:
+        retry_counter = 0
+        while True and retry_counter < 10:
             r = requests.get(url, headers=headers, params=params, timeout=TIMEOUT)
+            retry_counter += 1
             if r.status_code == 429:
                 retry_timer = int(r.headers.get("Retry-After", "1"))
                 time.sleep(retry_timer)
                 continue
+
+
             r.raise_for_status()
             data = r.json()
             for item in data.get("items", []):
@@ -163,3 +167,62 @@ class SpotifyClient:
             self.add_items(playlist_id, keep_uris)
         
         return {"original": original_count, "kept": len(keep_uris), "removed": len(delete_uris)}
+
+    def create_playlist(self, user_id: str, name: str, description: str = "", public: bool = False) -> str: 
+        """
+        Create a new playlist under the given user account.
+        Returns the new playlist ID.
+        """
+        headers = self._auth_header(write=True)
+        headers.update({"Content-Type": "application/json"})
+        body = {
+            "name": name,
+            "description": description,
+            "public": public,
+        }
+        r = requests.post(f"{API_URL}/users/{user_id}/playlists",
+                          headers=headers, json=body, timeout=30)
+        r.raise_for_status()
+        return r.json()["id"]
+
+    def get_current_user_id(self) -> str:
+        headers = self._auth_header(write=True)
+        r = requests.get(f"{API_URL}/me", headers=headers, timeout=30)
+        r.raise_for_status()
+        return r.json()["id"]
+    
+    def playlist_name_from_id(self, playlist_id: str, write: bool) -> str: 
+        headers=self._auth_header(write=write)
+        pid = self.playlist_id_from_input(playlist_id)
+
+        url = f"{API_URL}/playlists/{pid}"
+
+        retry_counter = 0
+        while True and retry_counter < 5: 
+            r = requests.get(url, headers=headers, timeout=TIMEOUT)
+            retry_counter += 1
+            if r.status_code == 429: 
+                retry_timer = int(r.headers.get("Retry-After", "1"))
+                time.sleep(retry_timer)
+                continue
+            retry_counter += 1
+            try: 
+                r.raise_for_status()
+            except requests.HTTPError as e:
+                status = getattr(e.response, "status_code", None)
+                if status in (401, 404) and not write:
+                    print("Playlist may be private or restricted; retrying with user auth...")
+                    headers = self._auth_header(write=True)
+                    # loop will retry with new headers
+                    continue
+                else:
+                    raise
+
+            data = r.json()
+            
+            if data.get("name"): 
+                return data["name"]
+            else: 
+                print("Could not find the name of the original playlist, defaulting to Nothing")
+                return ""
+            
