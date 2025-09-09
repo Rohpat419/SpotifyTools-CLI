@@ -7,9 +7,14 @@ import urllib.parse as up
 from typing import Dict, Generator, List, Optional
 import requests
 
+from spotify_tools.auth.user_token_from_refresh import get_user_access_token
+from spotify_tools.duplicates import compute_keep_and_delete_uris
+
 TIMEOUT=30
 
 API_URL = "https://api.spotify.com/v1"
+
+
 
 class SpotifyClient: 
     def __init__(self, *, client_id: Optional[str] = None, client_secret: Optional[str] = None, user_token: Optional[str] = None):
@@ -37,14 +42,14 @@ class SpotifyClient:
     
     # auth token is either user token if doing a write to playlist or it's been supplied, handy for private playlist reads. ELSE use the app token for basic reads. 
     def _auth_header(self, write: bool) -> Dict[str, str]:
-        
-        if write or self.user_token: 
-            token = self.user_token
+        if write:
+            token = get_user_access_token()
         else: 
             token = self._get_app_token()
         # token = self.user_token if write or self.user_token else self._get_app_token()
         return {"Authorization": f"Bearer {token}"}
     
+
     # COME BACK TO THIS, should I enforce https right here?
     @staticmethod
     def playlist_id_from_input(input: str) -> str: 
@@ -57,7 +62,8 @@ class SpotifyClient:
         
         print("Playlist ID not parsed by parser, I hope you know what you're doing")        
         return input
-    
+
+
     def iter_playlist_items(self, playlist_id: str, *, write: bool = False):
         pid = self.playlist_id_from_input(playlist_id)
         headers = self._auth_header(write=write)
@@ -78,15 +84,16 @@ class SpotifyClient:
             url = data.get("next")
             if not url:
                 break
-
-    def remove_tracks(self, playlist_url: str, deletion_payload: dict) -> dict: 
-        playlist_id = self.playlist_id_from_input(playlist_url)
-        headers = self._auth_header(write=True)
-        headers.update({"Content-Type": "application/json"})
-        r = requests.delete(f"{API_URL}/playlists/{playlist_id}/tracks",
-                            headers=headers, json=deletion_payload, timeout=TIMEOUT)
-        r.raise_for_status()
-        return r.json()
+    
+    # Deletes all songs that are identified as duplicate, too destructive
+    # def remove_tracks(self, playlist_url: str, deletion_payload: dict) -> dict: 
+    #     playlist_id = self.playlist_id_from_input(playlist_url)
+    #     headers = self._auth_header(write=True)
+    #     headers.update({"Content-Type": "application/json"})
+    #     r = requests.delete(f"{API_URL}/playlists/{playlist_id}/tracks",
+    #                         headers=headers, json=deletion_payload, timeout=TIMEOUT)
+    #     r.raise_for_status()
+    #     return r.json()
         
 
     # OPTIONAL LOGIC: replaces items. Not a big fan of this idea
@@ -102,6 +109,25 @@ class SpotifyClient:
         r.raise_for_status()
         return r.json()
     
+    def remove_by_uri(self, playlist_id: str, uris: List[str]) -> None: 
+        pid = self.playlist_id_from_input(playlist_id)
+        headers = self._auth_header(write=True)
+        headers.update({"Content-Type": "application/json"})
+
+        seen = set()
+        unique = []
+        for u in uris: 
+            if u and u not in seen: 
+                seen.add(u)
+                unique.append(u)
+        # maxes out at 100 per call
+        for i in range(0, len(unique), 100):
+            chunk = unique[i:i+100]
+            payload = {"tracks": [{"uri": u} for u in chunk]} 
+            r = requests.delete(f"{API_URL}/playlists/{pid}/tracks",
+                    headers=headers, json=payload, timeout=TIMEOUT)
+            r.raise_for_status()
+
     def add_items(self, playlist_id: str, uris: List[str], position: Optional[int] = None) -> dict:
         """Append up to 100 URIs (or insert at a position)."""
         if len(uris) > 100:
@@ -117,3 +143,23 @@ class SpotifyClient:
         r.raise_for_status()
         return r.json()
     
+    def clear_dupes_then_readd(self, playlist_id: str, *, strict: bool = False, tol_secs: int = 2) -> dict:
+        """
+        Read the playlist
+        Build (keep_uris, delete_uris)
+        Delete all delete_uris
+        Add back keep_uris
+        """
+        
+        items = list(self.iter_playlist_items(playlist_id, write=True))
+        original_count = sum(1 for it in items if (it.get("track") or {}).get("type") == "track")
+
+        keep_uris, delete_uris = compute_keep_and_delete_uris(items, strict=strict, tol_secs=tol_secs)
+
+        if delete_uris: 
+            self.remove_by_uri(playlist_id, delete_uris)
+        
+        if keep_uris: 
+            self.add_items(playlist_id, keep_uris)
+        
+        return {"original": original_count, "kept": len(keep_uris), "removed": len(delete_uris)}

@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime, timedelta
 
 
-from src.duplicates import group_duplicates, build_delete_payload
+from src.spotify_tools.duplicates import group_duplicates, build_delete_payload
 
 # -------- helpers --------
 
@@ -127,25 +127,4 @@ def test_cjk_titles_preserved_and_not_cross_grouped():
     assert names_in_group == {"もしも命が描けたら"}
 
 
-def test_build_delete_payload_keeps_newest_and_targets_positions():
-    t0 = datetime(2024, 1, 1)
-    # Three occurrences of same logical track at positions 0,1,2 (by enumerate order)
-    items = [
-        mk_item("Dup", ["Artist"], 200000, "spotify:track:z", iso(t0)),                      # pos 0 (oldest)
-        mk_item("Dup", ["Artist"], 200000, "spotify:track:z", iso(t0 + timedelta(hours=1))), # pos 1
-        mk_item("Dup", ["Artist"], 200000, "spotify:track:z", iso(t0 + timedelta(hours=2))), # pos 2 (newest)
-    ]
-    groups = group_duplicates(items, strict=False, tol_secs=0)
-    assert len(groups) == 1
-    g = groups[0]
-    # newest is last
-    assert g.tracks[-1].added_at == iso(t0 + timedelta(hours=2))
-
-    payload = build_delete_payload(groups)
-    assert "tracks" in payload and isinstance(payload["tracks"], list)
-    # Should delete positions [1, 2] for this URI, keeping position 0
-    # Payload groups positions by URI
-    entry = next((e for e in payload["tracks"] if e["uri"] == "spotify:track:z"), None)
-    assert entry is not None
-    assert sorted(entry["positions"]) == [1, 2]
 

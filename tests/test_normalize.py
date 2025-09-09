@@ -1,6 +1,6 @@
 # Super basic tests to ensure the normalize functions work correctly
 import pytest
-from src.normalize import normalize_title, normalize_artists, _has_cjk
+from src.spotify_tools.normalize import normalize_title, normalize_artists, _has_cjk
 
 
 def test_normalize_title_relaxed():

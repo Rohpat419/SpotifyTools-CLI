@@ -21,3 +21,4 @@ Thumbs.db
 *.json
 !requirements.txt
 oldFiles
+*.egg-info/

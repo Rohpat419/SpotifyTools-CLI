@@ -1,8 +1,8 @@
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Tuple
+from typing import Dict, Iterable, List, Tuple, Set
 from .normalize import normalize_title, normalize_artists
 
-DEFAULT_TOLERANCE=2
+DEFAULT_TOLERANCE=5
 
 KeyFormat = Tuple[str, Tuple[str, ...], int] 
 
@@ -92,12 +92,80 @@ def build_delete_payload(groups: List[DuplicateGroup]) -> dict:
             continue
         keep = group.tracks[0] # keep oldest track, "This is when I first discovered this track"
         to_remove = [t for t in group.tracks if t is not keep]
-        position_by_uri: Dict[str, List[int]] = {}
         # track both the uri and playlist idx of duplicates, both are used to coordinate a delete
         for track in to_remove: 
-            position_by_uri.setdefault(track.uri, []).append(track.playlist_idx)
-        for uri, positions in position_by_uri.items(): 
-            tracks_payload.append({"uri": uri, "positions": positions})
+            tracks_payload.append({"uri": track.uri})
     # package into this format that the endpoint is expecting
     return {"tracks": tracks_payload}
 
+def compute_keep_and_delete_uris(
+    items: Iterable[dict], *, strict: bool = False, tol_secs: int = DEFAULT_TOLERANCE
+) -> Tuple[List[str], List[str]]:
+    """
+    Returns (keep_uris_for_duplicate_keys, delete_uris).
+
+    - keep_uris: first occurrence's URI **only for keys that appear >1 times**.
+    - delete_uris: ALL URIs that belong to any key with >1 occurrences (so removing them wipes all copies).
+    """
+    tracks: List[Track] = []
+    for pos, item in enumerate(items):
+        track = item.get("track") or {}
+        if not track or track.get("type") != "track":
+            continue
+        name = track.get("name") or ""
+        artists = [a.get("name", "") for a in track.get("artists", [])]
+        album = (track.get("album") or {}).get("name", "")
+        uri = track.get("uri") or ""
+        duration = int(track.get("duration_ms") or 0)
+        added_at = item.get("added_at") or ""
+        tracks.append(Track(name, artists, album, uri, duration, added_at, pos))
+
+    # First-seen canonical keys (in playlist order), their URI sets, and their first (keeper) URI
+    first_keys: List[KeyFormat] = []
+    uris_by_key: List[Set[str]] = []
+    keeper_by_key: List[str] = []
+
+    for t in tracks:
+        title, arts, sec = make_key(t, strict=strict)
+
+        idx = -1
+        for i, (t2, a2, s2) in enumerate(first_keys):
+            if t2 == title and a2 == arts and within_tolerance(sec, s2, tol_secs):
+                idx = i
+                break
+
+        if idx == -1:
+            first_keys.append((title, arts, sec))
+            uris_by_key.append({t.uri})
+            keeper_by_key.append(t.uri)        # first occurrence -> potential keeper
+        else:
+            uris_by_key[idx].add(t.uri)
+
+    # Count occurrences per canonical key
+    counts: List[int] = [0] * len(first_keys)
+    for t in tracks:
+        t_title, t_arts, t_sec = make_key(t, strict=strict)
+        for i, (k_title, k_arts, k_sec) in enumerate(first_keys):
+            if k_title == t_title and k_arts == t_arts and within_tolerance(t_sec, k_sec, tol_secs):
+                counts[i] += 1
+                break
+
+    # Build outputs:
+    # - keep only keepers for keys with >1 occurrences
+    # - delete all URIs for keys with >1 occurrences
+    keep_uris: List[str] = []
+    delete_uris_set: Set[str] = set()
+    for i, c in enumerate(counts):
+        if c > 1:
+            keep_uris.append(keeper_by_key[i])
+            delete_uris_set.update(uris_by_key[i])
+
+    # stable-unique delete list
+    seen: Set[str] = set()
+    delete_uris: List[str] = []
+    for u in delete_uris_set:
+        if u not in seen:
+            seen.add(u)
+            delete_uris.append(u)
+
+    return keep_uris, delete_uris
