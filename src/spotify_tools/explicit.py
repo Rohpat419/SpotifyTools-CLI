@@ -134,12 +134,12 @@ def explicit_report_from_playlist(
                     })
             elif not lyrics:
                 print("Lyrics could not be found for the following song:")
-                print(f"{name} - {', '.join(artists)}")
+                print(f"{name} - {', '.join(artists)}\n")
 
 
 
         if idx % 25 == 0 or idx == len(items): 
-            print(f"Processed {idx}/{len(items)} tracks")
+            print(f"Processed {idx}/{len(items)} tracks\n")
     return out
 
 def print_explicit_report(rows: List[Dict]) -> None:
