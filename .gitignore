@@ -22,3 +22,4 @@ Thumbs.db
 !requirements.txt
 oldFiles
 *.egg-info/
+localhost*

@@ -89,7 +89,7 @@ def main():
     r.raise_for_status()
     tok = r.json()
     print("\nACCESS TOKEN (expires ~1h):\n", tok["access_token"])
-    print("\nREFRESH TOKEN (save this in .env):\n", tok["refresh_token"])
+    print("\nREFRESH TOKEN:\n", tok["refresh_token"])
     print("\nEXPIRES IN (seconds):", tok.get("expires_in"))
     print("\nNext: put this in your .env -> SPOTIFY_REFRESH_TOKEN=...")
 
