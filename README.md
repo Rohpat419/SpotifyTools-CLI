@@ -32,7 +32,7 @@ This is not a native spotify feature and was the first tool that I wanted to cre
     ```
 ![Image showing cloning repo and cd into it](img/cloneCd.png)
 
-![Image showing python env setup](img/cropped/)
+![Image showing python env setup](img/pythonSetup.png)
 
 
 2. Generate local certs for redirect URI:
@@ -64,11 +64,13 @@ Rename the copied file to `.env`. Like so:
     python -m spotify_tools.auth.server
     ```
 
-This will create a `spotify_tokens.json` file in the root directory that will be used to authenticate requests.
+Then ctrl+click the link in terminal or paste https://127.0.0.1:8080 into your browser. Login with Spotify on that page. 
 
 ![Image showing running auth server command](img/terminalServer.png)
-
 ![Image showing OAuth page](img/oAuthLogin.png)
+This will create a `spotify_tokens.json` file in the root directory that will be used to authenticate requests.
+
+
 &nbsp;
 
 5. Run the application: 
@@ -82,6 +84,6 @@ Now feel free to explore the different features this app has to offer, the CLI w
 ![Image showing running the CLI command](img/openCLI.png)
 
 ## Next Steps: 
-1. Make a frontend for the app. A terminal app is not the most user friendly. If I can host the frontend as this can make the user experience easier than having them set up the environment themselves. 
-2. convert the scripts into a real backend that can serve API requests. Then hook up the frontend to the backend. This backend needs to be hosted somewhere like render.com. 
+1. Make a frontend for the app. A terminal app is not the most user friendly. I can host the frontend to make the user experience easier than having them set up the environment. 
+2. Convert the scripts into a real backend that can serve API requests. Then hook up the frontend to the backend. This backend needs to be hosted somewhere like render.com. 
 3. Conduct a security review. Checking if tokens/keys are ever leaked. The refresh token is stored in plaintext on the user's computer which is already a flaw. This was considered OK since this is a dev POC typa project. 
