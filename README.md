@@ -1,19 +1,21 @@
-# SpotifyTools
+# SpotifyTools - CLI App
 Some tools that I thought would be useful for my Spotify experience that weren't built into the app. 
 
-## Features
+## Tools
 
 - **Duplicate Cleaner**: Remove duplicate songs from your playlists.
 
-This is not a native spotify feature and was the first tool that I wanted to create for this project. The idea was first realized years ago in a super messy script. Now it exists as part of the semi-decent terminal app you see here. 
-
+This is surprisingly not a native spotify feature and was the first tool that I wanted to create for this project. The idea was first realized years ago in a super messy script. Now it exists as part of the semi-decent terminal app you see here. 
 
 
 - **Explicit Content Filter**: Remove explicit content from your playlists.
 
+This idea came to me when I was driving my little cousin home from school and I played my family friendly playlist. This playlist had 0 songs with the Spotify Explicit tag on it, but Hot N Cold by Katy Perry was in the playlist. This song is not marked as explicit on Spotify but it contains a curse word. I wanted a way to filter out explicit content based on lyrics. 
+
 
 - **Top Artists/Tracks**: Get a list of your top artists or tracks.
 
+I saw that the Spotify API has an endpoint for grabbing a user's top artists and tracks. I thought it would be a cool and easy feature to tack on to the app. People do like to see this kind of data (cough cough, Spotify Wrapped).
 
 
 ## How to Use
