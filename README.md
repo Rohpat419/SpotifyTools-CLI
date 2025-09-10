@@ -23,14 +23,14 @@ I saw that the Spotify API has an endpoint for grabbing a user's top artists and
 
 1. Clone the repository, set up Python environment:
    ```bash
-git clone https://github.com/Rohpat419/SpotifyTools-CLI.git
-cd SpotifyTools-CLI
-
-python -m venv .venv
-# On windows, allow scripts to run
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\activate # On macOS/Linux use `source .venv/bin/activate`
-pip install -e .
+    git clone https://github.com/Rohpat419/SpotifyTools-CLI.git
+    cd SpotifyTools-CLI
+    
+    python -m venv .venv
+    # On windows, allow scripts to run
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+    .\.venv\Scripts\activate # On macOS/Linux use `source .venv/bin/activate`
+    pip install -e .
     ```
 ![Image showing cloning repo and cd into it](img/cloneCd.png)
 
