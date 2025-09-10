@@ -53,7 +53,7 @@ def interactive_run(client: SpotifyClient) -> None:
         
     time_range = {"1": "short_term", "2": "medium_term", "3": "long_term"}.get(tr_choice, "short_term")
 
-    print("Choose type:")
+    print("\nChoose type:")
     print("  1) Tracks")
     print("  2) Artists")
     kind_choice = (input("Enter 1 or 2: ").strip() or "1")
